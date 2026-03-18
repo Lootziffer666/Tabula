@@ -81,6 +81,21 @@ def requirements_layout_check() -> bool:
     return ok
 
 
+
+def profiles_check() -> bool:
+    expected = [
+        ROOT / "profiles/core_only.modules.json",
+        ROOT / "profiles/full.modules.json",
+    ]
+    ok = True
+    for file_path in expected:
+        if file_path.exists():
+            print_result(True, f"profiles:{file_path.relative_to(ROOT)}")
+        else:
+            ok = False
+            print_result(False, f"profiles:{file_path.relative_to(ROOT)}", "missing")
+    return ok
+
 def dependency_check() -> bool:
     deps = [
         "customtkinter",
@@ -172,6 +187,7 @@ def main() -> int:
         ("syntax", syntax_check),
         ("json-catalog", json_and_catalog_check),
         ("requirements", requirements_layout_check),
+        ("profiles", profiles_check),
         ("deps", dependency_check),
         ("imports", import_check),
         ("gui", gui_bootstrap_check),

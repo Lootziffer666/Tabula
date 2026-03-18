@@ -1,25 +1,42 @@
-# SymLinkManager — Regelwerk/Blueprint
+# Tabula
 
-Dieses Repository enthält aktuell das technische Regelwerk v1.1 als Umsetzungsbasis sowie den Prototyp **Tabula**.
+**Fix my mess. Safely.**
 
-## Inhalte
+Das lokale Windows-Tool, das chaotische Systeme wieder wartbar macht – **ohne Neuinstallation und ohne Risiko**.
 
-- `docs/regelwerk_v1.1.md` — Feinkonzept inkl. Datenmodell, Safety-Regeln, Workflows und MVP-Iterationen.
-- `rules/whitelist.txt` — Startwerte für Schutzregeln.
-- `rules/blacklist.txt` — Startwerte für Markierungsregeln.
-- `rules/task-whitelist.txt` — geschützte Task-Muster (kritische Systemaufgaben).
-- `rules/task-blacklist.txt` — Triage-Kandidaten für unkritische Updater-/Helper-Tasks.
-- `schemas/*.schema.json` — JSON-Schemas für zentrale Datenobjekte.
-- `claude.md` — ergebnisoffener Anforderungskatalog (was das Tool können soll), ohne technische Vorgehensvorgaben.
-- `Tabula/` — modulares Barebone-Desktoptool (GUI-Host + einzeln zuschaltbare Module).
-- `Tabula/micro_apps/catalog.json` — zentrale Übersicht aller Mikro-Apps (Add-ons/Plugins-Rubrik).
-- `Addons/` — Standalone-Script-Sammlungen (`maintenance`, `system_repair`, `ai_shell`).
+### Was Tabula kann
+- Intelligente Programme- & UWP-Analyse mit realistischen Größen
+- Archive-Scanner (ZIP/RAR/7z/MSI) + Passwort-Check
+- Sicheres Debloat (Copilot, Recall, Widgets, Xbox…)
+- Task Scheduler + Autoruns + Services Optimizer
+- Privacy-Presets (Balanced / Strict / Paranoid)
+- Smart Duplicate Finder + „Keep Best“ + echte Fusion mit markierten Änderungen
+- Preview → Dry-Run → Snapshot → Undo (alles reversibel)
+- Performance History + Benchmark-Vergleich
+- 100 % lokal – keine Cloud, keine Telemetrie
 
-## Tabula (Kurz)
-- Modulkonfiguration über `Tabula/modules.json`
-- Modul-Host in `Tabula/gui/main_window.py`
-- GUI-Module in `Tabula/gui/modules/`
-- Requirements als Overview + pro Modul in `Tabula/requirements*.txt` und `Tabula/requirements/*.txt`
-- Smoke-Test in `Tabula/scripts/smoke_test.py`
-- AI Companion Hinweise in `Tabula/ai_companion/CUSTOMGPT_SETUP.md`
+### Status
+**v0.1 Prototype** (März 2026) – Kernfunktionen laufen stabil  
+Dein Logo ist bereits eingebunden.
 
+### Schnellstart
+1. Python 3.12 installieren  
+2. `pip install -r Tabula/requirements.txt`  
+3. `python Tabula/tabula.py`
+
+---
+
+**Roadmap**  
+- v0.2: Stabile Kernfunktionen + Smoke-Tests  
+- v0.3: Lokaler AI Companion + Import von Tabula-Exports  
+- v1.0: Gap-Hunter-Addons + Performance History Dashboard
+
+Made with ❤️ für alle, die ihr Windows wieder liebhaben wollen.
+
+
+### Sichere Live-Tests (Windows)
+- Nutze zuerst den Playbook-Guide: `docs/windows_live_test_playbook.md`
+- Default ist jetzt ein reduziertes Core-Profil (Nightly/Add-ons sind beiseite gelegt)
+
+### Produkt-Reifeplan
+- `docs/productization_checklist.md`

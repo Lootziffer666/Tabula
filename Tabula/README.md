@@ -29,6 +29,17 @@ python tabula.py
 ```
 
 
+
+## Profile (Core vs Full)
+- Default: `core_only.modules.json` (risikoärmer)
+- Optional: `full.modules.json`
+- Umschalten:
+```bash
+python scripts/apply_profile.py --list
+python scripts/apply_profile.py core_only.modules.json
+python scripts/apply_profile.py full.modules.json
+```
+
 ## Barebone GUI + modulare Architektur
 Tabula läuft als **Barebone-Host**. Jedes Feature ist ein eigenes GUI-Modul, einzeln aktivierbar über `modules.json` bzw. den Tab **Module**.
 
