@@ -23,6 +23,17 @@ def _text_content(file: Path) -> str:
     return ""
 
 
+def _full_file_digest(file: Path, chunk_size: int = 1024 * 1024) -> str:
+    hasher = xxhash.xxh64()
+    with file.open("rb") as handle:
+        while True:
+            chunk = handle.read(chunk_size)
+            if not chunk:
+                break
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
 def calculate_keep_best_scores(files: list[Path]) -> dict[Path, float]:
     scores: dict[Path, float] = {}
     text_cache = {f: _text_content(f) for f in files}
@@ -64,8 +75,7 @@ def scan_duplicates(folder_path: str, similarity_threshold: int = 85) -> list[Du
         if not file.is_file() or file.suffix.lower() not in candidates:
             continue
         try:
-            payload = file.read_bytes()[:10000]
-            digest = xxhash.xxh64(payload).hexdigest()
+            digest = _full_file_digest(file)
             hash_groups.setdefault(digest, []).append(file)
         except Exception:
             continue
