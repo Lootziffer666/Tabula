@@ -1,65 +1,79 @@
 from __future__ import annotations
 
+from datetime import datetime
 from enum import Enum
-from pydantic import BaseModel, Field
+from typing import Optional
+
+from pydantic import BaseModel
 
 
 class RiskLevel(str, Enum):
     LOW = "Low"
     MEDIUM = "Medium"
     HIGH = "High"
-    CRITICAL = "Critical"
 
 
-class ProgramEntry(BaseModel):
-    name: str
-    publisher: str = ""
-    version: str = ""
-    install_dir: str = ""
-    uninstall_cmd: str = ""
-    size_mb: float = 0.0
-    confidence: str = "Low"
-    category: str = "Application"
-    risk: str = RiskLevel.MEDIUM.value
-    is_system: bool = False
-    is_duplicate: bool = False
+class FolderKind(str, Enum):
+    CACHE = "Cache"
+    TEMP = "Temp"
+    SHADER_CACHE = "ShaderCache"
+    LOGS = "Logs"
+    SCREENSHOTS = "Screenshots"
+    SUPPORT_DATA = "SupportData"
+    SAVE_DATA = "SaveData"
+    INSTALL_DATA = "InstallData"
+    UNKNOWN = "Unknown"
 
 
-class UWPEntry(BaseModel):
-    name: str
-    package_fullname: str
-    is_ai_related: bool = False
+class RecommendedAction(str, Enum):
+    KEEP = "Keep"
+    PURGE = "Purge"
+    RELOCATE = "Relocate"
+    REVIEW = "Review"
 
 
-class ArchiveEntry(BaseModel):
+class RelocationState(str, Enum):
+    NOT_RELOCATED = "NotRelocated"
+    RELOCATED = "Relocated"
+    BROKEN_LINK = "BrokenLink"
+    NEEDS_VALIDATION = "NeedsValidation"
+
+
+class LinkType(str, Enum):
+    JUNCTION = "Junction"
+    SYMLINK = "Symlink"
+
+
+class TabulaItem(BaseModel):
+    id: str
+    display_name: str
     path: str
-    file_type: str
-    size_mb: float
-    status: str
-    overlap_installed: bool = False
-    password_needed: bool = False
+    normalized_path: str
+    source_type: str = "KnownPath"
+    owner_hint: Optional[str] = None
+    kind: FolderKind = FolderKind.UNKNOWN
+    risk_level: RiskLevel = RiskLevel.MEDIUM
+    recommended_action: RecommendedAction = RecommendedAction.REVIEW
+    size_bytes: int = 0
+    size_human: str = "0 B"
+    item_count: Optional[int] = None
+    confidence: str = "Medium"
+    notes: Optional[str] = None
+    managed_by_tabula: bool = False
+    relocation_state: RelocationState = RelocationState.NOT_RELOCATED
+    original_path: Optional[str] = None
+    target_path: Optional[str] = None
+    link_type: Optional[LinkType] = None
+    last_validated_at: Optional[datetime] = None
 
 
-class ScheduledTaskEntry(BaseModel):
-    name: str
-    path: str
-    enabled: bool
-    state: str = "Unknown"
-    is_critical: bool = False
-    orphaned: bool = False
-    risk: str = RiskLevel.MEDIUM.value
-
-
-class ActionPlan(BaseModel):
-    action_type: str
-    target: str
-    description: str
-    impact_mb: float = 0.0
-    risk: str = RiskLevel.MEDIUM.value
-    requires_reboot: bool = False
-    dry_run_preview: str = ""
-
-
-class DuplicateAction(ActionPlan):
-    files_to_delete: list[str] = Field(default_factory=list)
-    merged_file: str = ""
+class RelocationRecord(BaseModel):
+    id: str
+    source_path: str
+    target_path: str
+    link_type: LinkType
+    created_at: datetime
+    validated: bool = False
+    validation_notes: Optional[str] = None
+    undo_supported: bool = True
+    status: str = "Active"
