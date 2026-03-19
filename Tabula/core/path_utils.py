@@ -1,28 +1,53 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
-PROTECTED_PATHS = [
-    os.path.expandvars(r"%WINDIR%"),
-    os.path.expandvars(r"%PROGRAMFILES%"),
-    os.path.expandvars(r"%PROGRAMFILES(X86)%"),
-    os.path.expandvars(r"%SYSTEMROOT%"),
-    os.path.expandvars(r"%USERPROFILE%"),
+PROTECTED_TREES = [
+    r"%WINDIR%",
+    r"%PROGRAMFILES%",
+    r"%PROGRAMFILES(X86)%",
+    r"%SYSTEMROOT%",
 ]
+
+PROTECTED_EXACT_PATHS = [
+    r"%USERPROFILE%",
+    r"%USERPROFILE%\Desktop",
+    r"%USERPROFILE%\Documents",
+    r"%USERPROFILE%\Pictures",
+    r"%USERPROFILE%\Videos",
+    r"%USERPROFILE%\Music",
+]
+
+_ENV_PATTERN = re.compile(r"%([^%]+)%")
 
 
 def expand_windows_path(path: str) -> str:
-    expanded = os.path.expandvars(path)
+    def replace_var(match: re.Match[str]) -> str:
+        var_name = match.group(1)
+        return os.environ.get(var_name, match.group(0))
+
+    expanded = _ENV_PATTERN.sub(replace_var, path)
+    expanded = os.path.expandvars(expanded)
+    expanded = expanded.replace("\\", os.sep)
     return os.path.expanduser(expanded)
 
 
 def is_protected(path: str) -> bool:
     candidate = Path(expand_windows_path(path)).resolve(strict=False)
-    for protected in PROTECTED_PATHS:
-        if not protected:
+
+    for protected in PROTECTED_EXACT_PATHS:
+        protected_path = Path(expand_windows_path(protected)).resolve(strict=False)
+        if str(protected_path) == protected:
             continue
+        if candidate == protected_path:
+            return True
+
+    for protected in PROTECTED_TREES:
         root = Path(expand_windows_path(protected)).resolve(strict=False)
+        if str(root) == protected:
+            continue
         try:
             if candidate == root or candidate.is_relative_to(root):
                 return True

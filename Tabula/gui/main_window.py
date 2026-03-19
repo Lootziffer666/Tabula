@@ -49,6 +49,7 @@ class TabulaApp(ctk.CTk):
         ctk.CTkButton(controls, text="Scan storage map", command=self.start_scan).pack(side="left", padx=6)
         self.risk_var = tk.StringVar(value="All")
         self.action_var = tk.StringVar(value="All")
+        self.scan_status = tk.StringVar(value="Click 'Scan storage map' to load relocation candidates.")
         ctk.CTkOptionMenu(controls, values=["All", "Low", "Medium", "High"], variable=self.risk_var, command=lambda _v: self.apply_filter()).pack(side="left", padx=6)
         ctk.CTkOptionMenu(controls, values=["All", "Keep", "Purge", "Relocate", "Review"], variable=self.action_var, command=lambda _v: self.apply_filter()).pack(side="left", padx=6)
 
@@ -60,8 +61,11 @@ class TabulaApp(ctk.CTk):
         self.map_tree.pack(fill="both", expand=True, padx=12, pady=8)
         self.map_tree.bind("<<TreeviewSelect>>", self.show_detail)
 
+        ctk.CTkLabel(tab, textvariable=self.scan_status, anchor="w", justify="left").pack(fill="x", padx=12, pady=(0, 6))
+
         self.detail_text = ctk.CTkTextbox(tab, height=180)
         self.detail_text.pack(fill="x", padx=12, pady=8)
+        self.detail_text.insert("1.0", "No scan results yet.")
         ctk.CTkButton(tab, text="Use selected item in Relocate", fg_color="#17803d", command=self.prepare_relocation).pack(pady=6)
 
     def _build_relocate_screen(self) -> None:
@@ -104,9 +108,23 @@ class TabulaApp(ctk.CTk):
 
     def start_scan(self) -> None:
         self.current_items = scan_storage_map()
-        self.apply_filter()
+        self.apply_filter(update_status=False)
+        if self.current_items:
+            total_bytes = sum(item.size_bytes for item in self.current_items)
+            self.scan_status.set(
+                f"Loaded {len(self.current_items)} candidate(s) with {total_bytes / (1024 ** 3):.2f} GB total size."
+            )
+        else:
+            self.scan_status.set(
+                "No relocation candidates found in the known paths. Check whether the folders exist on this PC or widen the scanner rules."
+            )
+            self.detail_text.delete("1.0", "end")
+            self.detail_text.insert(
+                "1.0",
+                "The scan button ran successfully, but none of the current known paths matched existing folders that are allowed by the protection rules.",
+            )
 
-    def apply_filter(self) -> None:
+    def apply_filter(self, update_status: bool = True) -> None:
         risk = self.risk_var.get()
         action = self.action_var.get()
         normalized_risk = "All" if risk == "All" else risk
@@ -114,7 +132,24 @@ class TabulaApp(ctk.CTk):
         for row in self.map_tree.get_children():
             self.map_tree.delete(row)
         for item in self.filtered_items:
-            self.map_tree.insert("", "end", values=(item.display_name, item.kind.value, item.size_human, item.risk_level.value, item.recommended_action.value, item.owner_hint or "—", item.path))
+            self.map_tree.insert(
+                "",
+                "end",
+                values=(
+                    item.display_name,
+                    item.kind.value,
+                    item.size_human,
+                    item.risk_level.value,
+                    item.recommended_action.value,
+                    item.owner_hint or "—",
+                    item.path,
+                ),
+            )
+
+        if update_status and self.current_items and not self.filtered_items:
+            self.scan_status.set("Scan finished, but the current filter hides all candidates. Reset filters to 'All' to see them again.")
+        elif update_status and self.filtered_items:
+            self.scan_status.set(f"Showing {len(self.filtered_items)} of {len(self.current_items)} scanned candidate(s).")
 
     def _selected_item(self) -> TabulaItem | None:
         selection = self.map_tree.selection()
@@ -177,7 +212,11 @@ class TabulaApp(ctk.CTk):
         for row in self.links_tree.get_children():
             self.links_tree.delete(row)
         for record in self.link_manager.load_links():
-            self.links_tree.insert("", "end", values=(record.source_path, record.target_path, record.link_type.value, record.status, "Yes" if record.validated else "No"))
+            self.links_tree.insert(
+                "",
+                "end",
+                values=(record.source_path, record.target_path, record.link_type.value, record.status, "Yes" if record.validated else "No"),
+            )
 
     def validate_links(self) -> None:
         self.link_manager.validate_all()
@@ -192,7 +231,10 @@ class TabulaApp(ctk.CTk):
             self.history_text.insert("1.0", "No relocation history recorded yet.")
             return
         for record in records:
-            self.history_text.insert("end", f"{record.created_at.isoformat()} | {record.source_path} -> {record.target_path} | {record.link_type.value} | {record.status}\n")
+            self.history_text.insert(
+                "end",
+                f"{record.created_at.isoformat()} | {record.source_path} -> {record.target_path} | {record.link_type.value} | {record.status}\n",
+            )
 
     def export_history(self) -> None:
         destination = Path(self.engine.base_dir) / "history_export.json"
