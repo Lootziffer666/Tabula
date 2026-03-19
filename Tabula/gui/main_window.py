@@ -74,6 +74,8 @@ class TabulaApp(ctk.CTk):
         self.storage_risk_var = tk.StringVar(value="All")
         self.storage_action_var = tk.StringVar(value="All")
         self.inventory_status = tk.StringVar(value="Run a scan to build the software and storage decision surface.")
+        self.inventory_activity = tk.StringVar(value="Current scan step: idle")
+        self.inventory_command = tk.StringVar(value="Current source/command: —")
 
         filter_bar = ctk.CTkFrame(tab)
         filter_bar.pack(fill="x", padx=12, pady=(0, 8))
@@ -90,6 +92,11 @@ class TabulaApp(ctk.CTk):
         ctk.CTkOptionMenu(filter_bar, values=["All", "Low", "Medium", "High"], variable=self.storage_risk_var, command=lambda _v: self.apply_inventory_filters()).pack(side="right", padx=6, pady=6)
         ctk.CTkOptionMenu(filter_bar, values=["All", "Keep", "Purge", "Relocate", "Review"], variable=self.storage_action_var, command=lambda _v: self.apply_inventory_filters()).pack(side="right", padx=6, pady=6)
 
+        self.inventory_progress = ctk.CTkProgressBar(tab, mode="indeterminate")
+        self.inventory_progress.pack(fill="x", padx=12, pady=(0, 4))
+        self.inventory_progress.set(0)
+        ctk.CTkLabel(tab, textvariable=self.inventory_activity, anchor="w", justify="left", font=ctk.CTkFont(size=14, weight="bold")).pack(fill="x", padx=12)
+        ctk.CTkLabel(tab, textvariable=self.inventory_command, anchor="w", justify="left", font=ctk.CTkFont(size=13)).pack(fill="x", padx=12, pady=(0, 4))
         ctk.CTkLabel(tab, textvariable=self.inventory_status, anchor="w", justify="left", font=ctk.CTkFont(size=14)).pack(fill="x", padx=12, pady=(0, 8))
 
         ctk.CTkLabel(tab, text="Programs", font=ctk.CTkFont(size=18, weight="bold")).pack(anchor="w", padx=12)
@@ -186,22 +193,46 @@ class TabulaApp(ctk.CTk):
         self.history_text = ctk.CTkTextbox(tab, height=720, font=("Consolas", 14))
         self.history_text.pack(fill="both", expand=True, padx=12, pady=(0, 10))
 
+    def _begin_scan(self, step: str, command: str) -> None:
+        self.inventory_activity.set(f"Current scan step: {step}")
+        self.inventory_command.set(f"Current source/command: {command}")
+        self.inventory_progress.start()
+        self.update_idletasks()
+
+    def _scan_progress(self, step: str, command: str) -> None:
+        self.inventory_activity.set(f"Current scan step: {step}")
+        self.inventory_command.set(f"Current source/command: {command}")
+        self.update_idletasks()
+
+    def _end_scan(self, summary: str) -> None:
+        self.inventory_progress.stop()
+        self.inventory_activity.set("Current scan step: idle")
+        self.inventory_command.set("Current source/command: —")
+        self.inventory_status.set(summary)
+        self.update_idletasks()
+
     def scan_programs(self) -> None:
-        self.program_items = scan_installed_programs()
+        self._begin_scan("Preparing program inventory", "Win32 uninstall registry scan")
+        self.program_items = scan_installed_programs(progress_callback=self._scan_progress)
         self.apply_inventory_filters()
-        self._update_inventory_status()
+        self._end_scan(
+            f"Program scan finished: {len(self.visible_program_items)}/{len(self.program_items)} visible entries."
+        )
 
     def scan_storage(self) -> None:
-        self.storage_items = scan_storage_items()
+        self._begin_scan("Preparing storage inventory", "Known user/cache paths")
+        self.storage_items = scan_storage_items(progress_callback=self._scan_progress)
         self.apply_inventory_filters()
         self._refresh_purge_screen()
         self._refresh_relocate_screen()
-        self._update_inventory_status()
+        self._end_scan(
+            f"Storage scan finished: {len(self.visible_storage_items)}/{len(self.storage_items)} visible candidates."
+        )
 
     def scan_all(self) -> None:
         self.scan_programs()
         self.scan_storage()
-        self._update_inventory_status(force_text="Inventory refreshed: programs + storage candidates loaded.")
+        self.inventory_status.set("Inventory refreshed: programs + storage candidates loaded.")
 
     def apply_inventory_filters(self) -> None:
         self.visible_program_items = filter_programs(
@@ -222,7 +253,8 @@ class TabulaApp(ctk.CTk):
         self._render_storage()
         self._refresh_purge_screen()
         self._refresh_relocate_screen()
-        self._update_inventory_status()
+        if self.program_items or self.storage_items:
+            self._update_inventory_status()
 
     def _render_programs(self) -> None:
         for row in self.program_tree.get_children():
@@ -262,6 +294,12 @@ class TabulaApp(ctk.CTk):
                     item.path,
                 ),
             )
+        if self.storage_items and not self.visible_storage_items:
+            self.inventory_detail.delete("1.0", "end")
+            self.inventory_detail.insert("1.0", "Storage scan found items, but the current filters hide them. Reset risk/action filters to 'All'.")
+        elif not self.storage_items:
+            self.inventory_detail.delete("1.0", "end")
+            self.inventory_detail.insert("1.0", "No storage candidates found yet. The current scanner now checks temp/cache, Steam/NVIDIA, Gradle caches, pip caches, uv caches, screenshots and captures.")
 
     def _refresh_purge_screen(self) -> None:
         if not self.storage_items:
@@ -462,10 +500,7 @@ class TabulaApp(ctk.CTk):
         self.inventory_detail.delete("1.0", "end")
         self.inventory_detail.insert("1.0", details)
 
-    def _update_inventory_status(self, force_text: str | None = None) -> None:
-        if force_text:
-            self.inventory_status.set(force_text)
-            return
+    def _update_inventory_status(self) -> None:
         self.inventory_status.set(
             f"Programs: {len(self.visible_program_items)}/{len(self.program_items)} visible • "
             f"Storage: {len(self.visible_storage_items)}/{len(self.storage_items)} visible • "

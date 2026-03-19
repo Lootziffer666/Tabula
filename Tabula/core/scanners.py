@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Callable
 from pathlib import Path
 
 from .models import (
@@ -89,6 +90,66 @@ STORAGE_TARGETS = [
         "reclaimable_ratio": 0.25,
         "movable_ratio": 1.0,
     },
+    {
+        "display_name": "Gradle Caches",
+        "path": r"%USERPROFILE%\.gradle\caches",
+        "kind": StorageKind.CACHE,
+        "risk": RiskLevel.LOW,
+        "action": RecommendedAction.PURGE,
+        "owner": "Gradle",
+        "source": "KnownPath",
+        "notes": "Gradle dependency caches in the user profile.",
+        "reclaimable_ratio": 1.0,
+        "movable_ratio": 1.0,
+    },
+    {
+        "display_name": "Gradle Wrapper Dists",
+        "path": r"%USERPROFILE%\.gradle\wrapper\dists",
+        "kind": StorageKind.CACHE,
+        "risk": RiskLevel.MEDIUM,
+        "action": RecommendedAction.RELOCATE,
+        "owner": "Gradle",
+        "source": "KnownPath",
+        "notes": "Large wrapper distributions; often better moved than kept on the SSD.",
+        "reclaimable_ratio": 0.5,
+        "movable_ratio": 1.0,
+    },
+    {
+        "display_name": "Python Pip Cache",
+        "path": r"%LOCALAPPDATA%\pip\Cache",
+        "kind": StorageKind.CACHE,
+        "risk": RiskLevel.LOW,
+        "action": RecommendedAction.PURGE,
+        "owner": "Python / pip",
+        "source": "KnownPath",
+        "notes": "pip package cache under the user profile.",
+        "reclaimable_ratio": 1.0,
+        "movable_ratio": 1.0,
+    },
+    {
+        "display_name": "Python User Cache",
+        "path": r"%USERPROFILE%\.cache\pip",
+        "kind": StorageKind.CACHE,
+        "risk": RiskLevel.LOW,
+        "action": RecommendedAction.PURGE,
+        "owner": "Python / pip",
+        "source": "KnownPath",
+        "notes": "Unix-style pip cache occasionally present on Windows developer setups.",
+        "reclaimable_ratio": 1.0,
+        "movable_ratio": 1.0,
+    },
+    {
+        "display_name": "UV Cache",
+        "path": r"%LOCALAPPDATA%\uv\cache",
+        "kind": StorageKind.CACHE,
+        "risk": RiskLevel.LOW,
+        "action": RecommendedAction.PURGE,
+        "owner": "Python / uv",
+        "source": "KnownPath",
+        "notes": "uv cache is rebuildable and usually safe to clear.",
+        "reclaimable_ratio": 1.0,
+        "movable_ratio": 1.0,
+    },
 ]
 
 
@@ -162,7 +223,7 @@ def _estimate_program_bytes(install_path: str) -> tuple[int, int, int, int, int,
     return install_bytes, user_data_bytes, cache_bytes, capture_bytes, total, confidence, notes
 
 
-def scan_installed_programs() -> list[ProgramEntry]:
+def scan_installed_programs(progress_callback: Callable[[str, str], None] | None = None) -> list[ProgramEntry]:
     if winreg is None:
         return []
 
@@ -170,6 +231,8 @@ def scan_installed_programs() -> list[ProgramEntry]:
     programs: dict[str, ProgramEntry] = {}
 
     for hive_name, subkey in PROGRAM_KEYS:
+        if progress_callback:
+            progress_callback("Registry scan", f"{hive_name}\\{subkey}")
         try:
             reg_key = winreg.OpenKey(hive_map[hive_name], subkey)
         except OSError:
@@ -188,6 +251,8 @@ def scan_installed_programs() -> list[ProgramEntry]:
                 uninstall_string = _safe_query_value(entry_key, "UninstallString")
                 quiet_uninstall_string = _safe_query_value(entry_key, "QuietUninstallString")
 
+                if progress_callback and index % 25 == 0:
+                    progress_callback("Sizing program", install_location or raw_name)
                 normalized = normalize_name(raw_name)
                 install_bytes, user_data_bytes, cache_bytes, capture_bytes, total, confidence, notes = _estimate_program_bytes(install_location)
                 record_type = _program_record_type(raw_name, publisher)
@@ -258,8 +323,14 @@ def _storage_item_from_spec(spec: dict) -> StorageItem | None:
     )
 
 
-def scan_storage_items() -> list[StorageItem]:
-    items = [item for item in (_storage_item_from_spec(spec) for spec in STORAGE_TARGETS) if item]
+def scan_storage_items(progress_callback: Callable[[str, str], None] | None = None) -> list[StorageItem]:
+    items: list[StorageItem] = []
+    for spec in STORAGE_TARGETS:
+        if progress_callback:
+            progress_callback("Storage scan", spec["path"])
+        item = _storage_item_from_spec(spec)
+        if item:
+            items.append(item)
     return sorted(items, key=lambda item: item.total_bytes, reverse=True)
 
 
