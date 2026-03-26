@@ -242,15 +242,41 @@ def _legal_hint(name: str) -> tuple[LegalStatus, str, list[str]]:
     return LegalStatus.UNKNOWN, "", []
 
 
-def _estimate_program_bytes(install_path: str) -> tuple[int, int, int, int, int, str, str]:
+def _safe_query_dword(key, value_name: str, default: int = 0) -> int:
+    try:
+        return int(winreg.QueryValueEx(key, value_name)[0])
+    except Exception:
+        return default
+
+
+def _parse_install_date(raw: str) -> str:
+    """Convert YYYYMMDD registry string to human-readable date."""
+    raw = raw.strip()
+    if len(raw) == 8 and raw.isdigit():
+        return f"{raw[:4]}-{raw[4:6]}-{raw[6:]}"
+    return raw
+
+
+def _estimate_program_bytes(install_path: str, reg_estimated_kb: int = 0) -> tuple[int, int, int, int, int, str, str]:
     install_dir = Path(install_path) if install_path else Path()
     install_bytes, _ = folder_size(install_dir) if install_path else (0, 0)
     user_data_bytes = 0
     cache_bytes = 0
     capture_bytes = 0
+    if install_bytes > 0:
+        # Best case: install folder was accessible and sized directly
+        confidence = "High"
+        notes = "Install path sized directly."
+    elif reg_estimated_kb > 0:
+        # Fallback: install folder missing/moved — use registry EstimatedSize (stored in KiB)
+        install_bytes = reg_estimated_kb * 1024
+        confidence = "Medium"
+        notes = "Größe vom Installer-Verzeichnis nicht messbar; Registry-Schätzung verwendet."
+    else:
+        # No usable size data available
+        confidence = "Low"
+        notes = "Install location missing or inaccessible."
     total = install_bytes + user_data_bytes + cache_bytes + capture_bytes
-    confidence = "High" if install_bytes else "Low"
-    notes = "Install path sized directly." if install_bytes else "Install location missing or inaccessible."
     return install_bytes, user_data_bytes, cache_bytes, capture_bytes, total, confidence, notes
 
 
@@ -281,11 +307,17 @@ def scan_installed_programs(progress_callback: Callable[[str, str], None] | None
                 install_location = _safe_query_value(entry_key, "InstallLocation")
                 uninstall_string = _safe_query_value(entry_key, "UninstallString")
                 quiet_uninstall_string = _safe_query_value(entry_key, "QuietUninstallString")
+                install_date_raw = _safe_query_value(entry_key, "InstallDate")
+                install_date = _parse_install_date(install_date_raw) if install_date_raw else ""
+                # EstimatedSize is in KiB (Windows registry standard)
+                reg_estimated_kb = _safe_query_dword(entry_key, "EstimatedSize")
 
                 if progress_callback and index % 25 == 0:
                     progress_callback("Sizing program", install_location or raw_name)
                 normalized = normalize_name(raw_name)
-                install_bytes, user_data_bytes, cache_bytes, capture_bytes, total, confidence, notes = _estimate_program_bytes(install_location)
+                install_bytes, user_data_bytes, cache_bytes, capture_bytes, total, confidence, notes = _estimate_program_bytes(
+                    install_location, reg_estimated_kb
+                )
                 record_type = _program_record_type(raw_name, publisher)
                 category = _program_category(raw_name)
                 legal_status, legal_hint, legal_alternatives = _legal_hint(raw_name)
@@ -322,6 +354,7 @@ def scan_installed_programs(progress_callback: Callable[[str, str], None] | None
                     legal_alternative_candidates=legal_alternatives,
                     duplicate_count=0,
                     duplicate_sources=[f"{hive_name}:{subkey}"],
+                    installed_at=install_date,
                 )
             except Exception:
                 continue
