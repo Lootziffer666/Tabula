@@ -28,7 +28,6 @@ jobs:
           pip install -r Tabula/requirements/gui.txt
           pip install -r Tabula/requirements/core.txt
           pip install -r Tabula/requirements/ai_companion.txt
-          pip install pyyaml
 
       - name: Build executables
         run: python build_executables.py --onefile
