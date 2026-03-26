@@ -22,10 +22,11 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install core dependencies
+      - name: Install smoke dependencies
+        working-directory: Tabula
         run: |
           pip install --upgrade pip
-          pip install psutil py7zr Pillow rapidfuzz xxhash python-docx pymupdf
+          pip install -r requirements/dev-smoke.txt
 
       - name: Run smoke test
         working-directory: Tabula
