@@ -30,7 +30,10 @@ jobs:
           pip install -r Tabula/requirements/ai_companion.txt
 
       - name: Build executables
-        run: python build_executables.py --onefile
+        env:
+          PYTHONUTF8: "1"
+          PYTHONIOENCODING: "utf-8"
+        run: python -X utf8 build_executables.py --onefile
 
       - name: Upload Tabula
         uses: actions/upload-artifact@v4
