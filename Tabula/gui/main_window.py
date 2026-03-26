@@ -25,8 +25,8 @@ def _load_module_config() -> dict[str, bool]:
     if config_path.exists():
         try:
             return json.loads(config_path.read_text(encoding="utf-8"))
-        except Exception:
-            logger.warning("modules.json unreadable, using defaults")
+        except Exception as exc:
+            logger.warning("modules.json unreadable, using defaults: %s", exc)
     return {}
 
 
@@ -67,11 +67,11 @@ class TabulaApp(ctk.CTk):
                 instance = mod_info["cls"]()
                 instance.build(tab, self, self.context)
                 self._active_modules.append(instance)
-            except Exception:
+            except Exception as exc:
                 logger.exception("Failed to build module %s", mod_id)
                 ctk.CTkLabel(
                     tab,
-                    text=f"Modul '{mod_info['title']}' konnte nicht geladen werden.",
+                    text=f"Modul '{mod_info['title']}' konnte nicht geladen werden:\n{exc}",
                     text_color="red",
                 ).pack(pady=20)
 
