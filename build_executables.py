@@ -35,7 +35,7 @@ def _run(cmd: list[str], label: str) -> None:
     print(f"  > {' '.join(cmd)}\n")
     result = subprocess.run(cmd, cwd=str(REPO_ROOT))
     if result.returncode != 0:
-        print(f"\n❌ {label} failed (exit code {result.returncode})")
+        print(f"\n[FAIL] {label} failed (exit code {result.returncode})")
         sys.exit(result.returncode)
     print(f"\n[OK] {label} succeeded")
 
@@ -49,7 +49,7 @@ def _collect_datas(entries: list[tuple[str, str]]) -> list[str]:
         if full.exists():
             args += ["--add-data", f"{full}{sep}{dest}"]
         else:
-            print(f"  ⚠ skipping missing data: {full}")
+            print(f"  [WARN] skipping missing data: {full}")
     return args
 
 
@@ -207,7 +207,7 @@ def main() -> int:
     try:
         import PyInstaller  # noqa: F401
     except ImportError:
-        print("❌ PyInstaller not found. Install it first:")
+        print("[FAIL] PyInstaller not found. Install it first:")
         print("   pip install -r Tabula/requirements/build.txt")
         return 1
 
